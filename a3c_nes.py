@@ -1,8 +1,8 @@
+import sys
 import argparse
 import copy
 import multiprocessing as mp
 import os
-import sys
 import statistics
 import time
 
@@ -105,24 +105,35 @@ def train_loop(process_idx, counter, max_score, args, agent, env, start_time):
                 global_t = counter.value
             local_t += 1
 
+            # Quit if we're out of time.
             if global_t > args.steps:
                 break
 
+            # Adjust the learning rate.
             agent.optimizer.lr = (
                 args.steps - global_t - 1) / args.steps * args.lr
 
+            # Accumulate the total and episode rewards.
             total_r += env.reward
             episode_r += env.reward
 
+            # Play a move.
+            # env.state is the last 4 screens, env.reward is the
+            # sum of rewards from that period.
             action = agent.act(env.state, env.reward, env.is_terminal)
 
+            # Handle game over.
             if env.is_terminal:
                 if process_idx == 0:
                     print('{} global_t:{} local_t:{} lr:{} episode_r:{}'.format(
                         args.outdir, global_t, local_t, agent.optimizer.lr, episode_r))
+
+                # Reset the episode reward counter and reset the environment.
                 episode_r = 0
                 env.initialize()
             else:
+
+                # Process the result.
                 env.receive_action(action)
 
             if global_t % args.eval_frequency == 0:
@@ -186,15 +197,14 @@ def main():
     os.environ['OMP_NUM_THREADS'] = '1'
 
     import logging
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('processes', type=int)
     parser.add_argument('rom', type=str)
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--outdir', type=str, default=None)
-#   parser.add_argument('--use-sdl', action='store_true')
-    parser.add_argument('--t-max', type=int, default=5)
+    parser.add_argument('--t-max', type=int, default=5) # Max time between learning steps.
     parser.add_argument('--beta', type=float, default=1e-2)
     parser.add_argument('--profile', action='store_true')
     parser.add_argument('--steps', type=int, default=8 * 10 ** 7)
@@ -203,7 +213,6 @@ def main():
     parser.add_argument('--eval-n-runs', type=int, default=10)
     parser.add_argument('--weight-decay', type=float, default=0.0)
     parser.add_argument('--use-lstm', action='store_true')
-#    parser.set_defaults(use_sdl=True)
     parser.set_defaults(use_lstm=True)
     args = parser.parse_args()
 
@@ -242,15 +251,25 @@ def main():
         column_names = ('steps', 'elapsed', 'mean', 'median', 'stdev')
         print('\t'.join(column_names), file=f)
 
+    # This is the function that each process actually runs.
     def run_func(process_idx):
+
+        # Initialize the emulator.
         env = nes.NES(args.rom)
+        
+        # Initialize the network and RMSProp function.
         model, opt = model_opt()
+
+        # Set the params and state of this process
+        # equal to those of the shared process.
         async.set_shared_params(model, shared_params)
         async.set_shared_states(opt, shared_states)
 
+        # Initialize the agent.
         agent = a3c.A3C(model, opt, args.t_max, 0.99, beta=args.beta,
                         process_idx=process_idx, phi=dqn_phi)
 
+        # Main loop.
         if args.profile:
             train_loop_with_profile(process_idx, counter, max_score,
                                     args, agent, env, start_time)
