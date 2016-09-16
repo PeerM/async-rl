@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import argparse
 import copy
@@ -19,6 +21,7 @@ import nes
 import random_seed
 import async
 import rmsprop_async
+import params
 from prepare_output_dir import prepare_output_dir
 from nonbias_weight_decay import NonbiasWeightDecay
 from init_like_torch import init_like_torch
@@ -197,23 +200,23 @@ def main():
     os.environ['OMP_NUM_THREADS'] = '1'
 
     import logging
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=params.log_level)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('processes', type=int)
     parser.add_argument('rom', type=str)
-    parser.add_argument('--seed', type=int, default=None)
-    parser.add_argument('--outdir', type=str, default=None)
-    parser.add_argument('--t-max', type=int, default=5) # Max time between learning steps.
-    parser.add_argument('--beta', type=float, default=1e-2)
+    parser.add_argument('--processes', type=int, default=params.num_processes)
+    parser.add_argument('--seed', type=int, default=params.seed)
+    parser.add_argument('--outdir', type=str, default=params.outdir)
+    parser.add_argument('--t-max', type=int, default=params.t_max) # Max time between learning steps.
+    parser.add_argument('--beta', type=float, default=params.beta)
     parser.add_argument('--profile', action='store_true')
-    parser.add_argument('--steps', type=int, default=8 * 10 ** 7)
-    parser.add_argument('--lr', type=float, default=7e-4)
-    parser.add_argument('--eval-frequency', type=int, default=10 ** 6)
-    parser.add_argument('--eval-n-runs', type=int, default=10)
-    parser.add_argument('--weight-decay', type=float, default=0.0)
+    parser.add_argument('--steps', type=int, default=params.steps)
+    parser.add_argument('--lr', type=float, default=params.lr)
+    parser.add_argument('--eval-frequency', type=int, default=params.eval_frequency)
+    parser.add_argument('--eval-n-runs', type=int, default=params.eval_n_runs)
+    parser.add_argument('--weight-decay', type=float, default=params.weight_decay)
     parser.add_argument('--use-lstm', action='store_true')
-    parser.set_defaults(use_lstm=True)
+    parser.set_defaults(use_lstm=params.use_ltsm)
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -230,7 +233,9 @@ def main():
             model = A3CLSTM(n_actions)
         else:
             model = A3CFF(n_actions)
-        opt = rmsprop_async.RMSpropAsync(lr=7e-4, eps=1e-1, alpha=0.99)
+        opt = rmsprop_async.RMSpropAsync(lr=params.RMSprop_lr,
+                                         eps=params.RMSprop_epsilon,
+                                         alpha=params.RMSprop_alpha)
         opt.setup(model)
         opt.add_hook(chainer.optimizer.GradientClipping(40))
         if args.weight_decay > 0:
@@ -266,7 +271,7 @@ def main():
         async.set_shared_states(opt, shared_states)
 
         # Initialize the agent.
-        agent = a3c.A3C(model, opt, args.t_max, 0.99, beta=args.beta,
+        agent = a3c.A3C(model, opt, args.t_max, gamma=params.gamma, beta=args.beta,
                         process_idx=process_idx, phi=dqn_phi)
 
         # Main loop.
