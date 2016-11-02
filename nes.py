@@ -4,7 +4,7 @@ import sys
 
 import numpy as np
 from nes_python_interface import NESInterface
-import cv2
+import scipy.misc
 
 import environment
 
@@ -54,7 +54,7 @@ class NES(environment.EpisodicEnvironment):
         img = rgb_img[:, :, 0] * 0.2126 + rgb_img[:, :, 1] * \
             0.0722 + rgb_img[:, :, 2] * 0.7152
         img = img.astype(np.uint8)
-        img = cv2.resize(img, (84, 84), interpolation=cv2.INTER_LINEAR)
+        img = scipy.misc.imresize(img, (84, 84))
         assert img.shape == (84, 84)
         return img
 

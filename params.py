@@ -21,7 +21,7 @@ eval_frequency = 100000 # How often we evaluate the model.
 eval_n_runs = 5 # How many episodes to evaluate.
 
 # Bookkeeping
-log_level = logging.DEBUG
-num_processes = 2
+log_level = logging.INFO
+num_processes = 4
 seed = None
 outdir = "output"
