@@ -3,7 +3,7 @@ import os
 import sys
 
 import numpy as np
-from nes_python_interface import NESInterface
+from extern.fceux_learningenv.nes_python_interface import NESInterface
 import scipy.misc
 
 import environment
@@ -16,13 +16,16 @@ class NES(environment.EpisodicEnvironment):
     def __init__(self, rom_filename, use_sdl=False, n_last_screens=4,
                  frame_skip=4, treat_life_lost_as_terminal=False,
                  crop_or_scale='scale', max_start_nullops=0,
-                 record_screen_dir=None):
+                 record_screen_dir=None, outside_nes_interface=None):
         self.n_last_screens = n_last_screens
         self.treat_life_lost_as_terminal = treat_life_lost_as_terminal
         self.crop_or_scale = crop_or_scale
         self.max_start_nullops = max_start_nullops
 
-        nes = NESInterface(rom_filename)
+        if outside_nes_interface is not None:
+            nes = outside_nes_interface
+        else:
+            nes = NESInterface(rom_filename)
 #        nes.setInt(b'random_seed', seed)
 #        nes.setFloat(b'repeat_action_probability', 0.0)
 #        nes.setBool(b'color_averaging', False)
@@ -110,8 +113,7 @@ class NES(environment.EpisodicEnvironment):
 
     def initialize(self):
 
-        if self.nes.game_over():
-            self.nes.reset_game()
+        self.nes.reset_game()
 
         if self.max_start_nullops > 0:
             n_nullops = np.random.randint(0, self.max_start_nullops + 1)
