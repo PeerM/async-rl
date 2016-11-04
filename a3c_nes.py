@@ -29,11 +29,11 @@ from nonbias_weight_decay import NonbiasWeightDecay
 from init_like_torch import init_like_torch
 from dqn_phi import dqn_phi
 import logging
-logger = logging.getLogger(__name__)
+
+from trained_model.nes_eval import Evaler
 
 
 class A3CFF(chainer.ChainList, a3c.A3CModel):
-
     def __init__(self, n_actions):
         self.head = dqn_head.NIPSDQNHead()
         self.pi = policy.FCSoftmaxPolicy(
@@ -48,7 +48,6 @@ class A3CFF(chainer.ChainList, a3c.A3CModel):
 
 
 class A3CLSTM(chainer.ChainList, a3c.A3CModel):
-
     def __init__(self, n_actions):
         self.head = dqn_head.NIPSDQNHead()
         self.pi = policy.FCSoftmaxPolicy(
@@ -77,17 +76,18 @@ class A3CLSTM(chainer.ChainList, a3c.A3CModel):
         self.lstm.c.unchain_backward()
 
 
-def eval_performance(rom, eval_env, p_func, n_runs):
+def eval_performance(rom, p_func, n_runs):
     assert n_runs > 1, 'Computing stdev requires at least two runs'
+    print("starting evaluation")
     scores = []
     for i in range(n_runs):
-        eval_env.initalize()
+        env = nes.NES(rom, treat_life_lost_as_terminal=False)
         test_r = 0
-        while not eval_env.is_terminal:
-            s = chainer.Variable(np.expand_dims(dqn_phi(eval_env.state), 0))
+        while not env.is_terminal:
+            s = chainer.Variable(np.expand_dims(dqn_phi(env.state), 0))
             pout = p_func(s)
             a = pout.action_indices[0]
-            test_r += eval_env.receive_action(a)
+            test_r += env.receive_action(a)
         scores.append(test_r)
         print('test_{}:'.format(i), test_r)
     mean = statistics.mean(scores)
@@ -96,8 +96,13 @@ def eval_performance(rom, eval_env, p_func, n_runs):
     return mean, median, stdev
 
 
-def train_loop(process_idx, counter, max_score, args, agent, env, eval_env, start_time):
+def train_loop(process_idx, counter, max_score, args, agent, env, evaler, start_time):
+    """
+
+    :type pool: mp.Pool
+    """
     try:
+        logger = logging.getLogger("{},{}".format(__name__, process_idx))
 
         total_r = 0
         episode_r = 0
@@ -118,7 +123,7 @@ def train_loop(process_idx, counter, max_score, args, agent, env, eval_env, star
 
             # Adjust the learning rate.
             agent.optimizer.lr = (
-                args.steps - global_t - 1) / args.steps * args.lr
+                                     args.steps - global_t - 1) / args.steps * args.lr
 
             # Accumulate the total and episode rewards.
             total_r += env.reward
@@ -155,8 +160,12 @@ def train_loop(process_idx, counter, max_score, args, agent, env, eval_env, star
                     pout, _ = test_model.pi_and_v(s)
                     test_model.unchain_backward()
                     return pout
-                mean, median, stdev = eval_performance(
-                    args.rom, eval_env, p_func, args.eval_n_runs)
+
+                mean, median, stdev = evaler.eval_performance(p_func, args.eval_n_runs)
+                # future = pool.apply_async(eval_performance, (args.rom, p_func, args.eval_n_runs))
+                # mean, median, stdev = future.get()
+                # eval_performance(
+                #    args.rom, p_func, args.eval_n_runs)
                 with open(os.path.join(args.outdir, 'scores.txt'), 'a+') as f:
                     elapsed = time.time() - start_time
                     record = (global_t, elapsed, mean, median, stdev)
@@ -189,19 +198,19 @@ def train_loop(process_idx, counter, max_score, args, agent, env, eval_env, star
         print('Saved the final model to {}'.format(args.outdir))
 
 
-def train_loop_with_profile(process_idx, counter, max_score, args, agent, env, eval_env,
-                            start_time):
+def train_loop_with_profile(process_idx, counter, max_score, args, agent, env, evaler, start_time):
     import cProfile
     cmd = 'train_loop(process_idx, counter, max_score, args, agent, env, ' \
-        'start_time)'
+          'start_time)'
     cProfile.runctx(cmd, globals(), locals(),
                     'profile-{}.out'.format(os.getpid()))
 
 
 def main():
-
     # Prevent numpy from using multiple threads
-    os.environ['OMP_NUM_THREADS'] = '1'
+    # os.environ['OMP_NUM_THREADS'] = '1'
+    # os.environ['NUMEXPR_NUM_THREADS'] = '1'
+    os.sched_setaffinity(0, {i for i in range(13)})
 
     logging.basicConfig(level=params.log_level)
 
@@ -210,7 +219,7 @@ def main():
     parser.add_argument('--processes', type=int, default=params.num_processes)
     parser.add_argument('--seed', type=int, default=params.seed)
     parser.add_argument('--outdir', type=str, default=params.outdir)
-    parser.add_argument('--t-max', type=int, default=params.t_max) # Max time between learning steps.
+    parser.add_argument('--t-max', type=int, default=params.t_max)  # Max time between learning steps.
     parser.add_argument('--beta', type=float, default=params.beta)
     parser.add_argument('--profile', action='store_true')
     parser.add_argument('--steps', type=int, default=params.steps)
@@ -230,6 +239,7 @@ def main():
     print('Output files are saved in {}'.format(args.outdir))
 
     n_actions = nes.NES(args.rom).number_of_actions
+
     # n_actions = 15
 
     def model_opt():
@@ -255,25 +265,27 @@ def main():
     counter = mp.Value('l', 0)
     start_time = time.time()
 
+    pool = mp.Pool(processes=1)
+
     # Write a header line first
     with open(os.path.join(args.outdir, 'scores.txt'), 'a+') as f:
         column_names = ('steps', 'elapsed', 'mean', 'median', 'stdev')
         print('\t'.join(column_names), file=f)
 
+    evaler = Evaler(args.rom)
     # This is the function that each process actually runs.
     def run_func(process_idx):
 
-        def nes_factory():
-            ## this env is the copy on write clone of the parameter env, because fork
-            # we'r in the fork here, so make sure to remove the relics of the nes of the parent
-            # nes_lib.delete_NES(env.nes.__del__())
-            return NESInterface(args.rom)
-
-        eval_env = nes.NES(args.rom, outside_nes_interface=DynamicProxyProcess(nes_factory))
-
+        # def nes_factory():
+        #     ## this env is the copy on write clone of the parameter env, because fork
+        #     # we'r in the fork here, so make sure to remove the relics of the nes of the parent
+        #     # nes_lib.delete_NES(env.nes.__del__())
+        #     return NESInterface(args.rom)
+        #
+        # eval_env = nes.NES(args.rom, outside_nes_interface=DynamicProxyProcess(nes_factory))
         # Initialize the emulator.
         env = nes.NES(args.rom)
-        
+
         # Initialize the network and RMSProp function.
         model, opt = model_opt()
 
@@ -289,10 +301,10 @@ def main():
         # Main loop.
         if args.profile:
             train_loop_with_profile(process_idx, counter, max_score,
-                                    args, agent, env, eval_env, start_time)
+                                    args, agent, env, evaler, start_time)
         else:
             train_loop(process_idx, counter, max_score,
-                       args, agent, env, eval_env, start_time)
+                       args, agent, env, evaler, start_time)
 
     async.run_async(args.processes, run_func)
 
