@@ -12,7 +12,7 @@ import chainer
 from chainer import links as L
 from chainer import functions as F
 import numpy as np
-from extern.fceux_learningenv.nes_python_interface import NESInterface
+from nes_python_interface import NESInterface
 
 import policy
 import v_function
@@ -276,15 +276,8 @@ def main():
     # This is the function that each process actually runs.
     def run_func(process_idx):
 
-        # def nes_factory():
-        #     ## this env is the copy on write clone of the parameter env, because fork
-        #     # we'r in the fork here, so make sure to remove the relics of the nes of the parent
-        #     # nes_lib.delete_NES(env.nes.__del__())
-        #     return NESInterface(args.rom)
-        #
-        # eval_env = nes.NES(args.rom, outside_nes_interface=DynamicProxyProcess(nes_factory))
         # Initialize the emulator.
-        env = nes.NES(args.rom)
+        env = nes.NES(args.rom,outside_nes_interface=NESInterface(args.rom,auto_render_period=240))
 
         # Initialize the network and RMSProp function.
         model, opt = model_opt()
@@ -307,6 +300,11 @@ def main():
                        args, agent, env, evaler, start_time)
 
     async.run_async(args.processes, run_func)
+    try:
+        evaler.env.nes._close()
+    except Exception:
+        pass
+
 
 
 if __name__ == '__main__':

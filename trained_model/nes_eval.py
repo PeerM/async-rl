@@ -17,7 +17,7 @@ class Evaler(object):
             ## this env is the copy on write clone of the parameter env, because fork
             # we'r in the fork here, so make sure to remove the relics of the nes of the parent
             # nes_lib.delete_NES(env.nes.__del__())
-            return NESInterface(rom)
+            return NESInterface(rom,auto_render_period=60)
 
         self.env = nes.NES(rom, outside_nes_interface=DynamicProxyProcess(nes_factory))
         self.lock = multiprocessing.Lock()
