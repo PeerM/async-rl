@@ -3,7 +3,7 @@ import os
 import sys
 
 import numpy as np
-from extern.fceux_learningenv.nes_python_interface import NESInterface
+from nes_python_interface import NESInterface
 import scipy.misc
 
 import environment
@@ -50,6 +50,14 @@ class NES(environment.EpisodicEnvironment):
         self.legal_actions = nes.getMinimalActionSet()
         self.initialize()
 
+        # maybe initialize recording
+        if record_screen_dir is not None:
+            import imageio
+            import os
+            self.movie_writer = imageio.get_writer(os.path.join(record_screen_dir, "mario_video.mp4"), fps=60)
+        else:
+            self.movie_writer = None
+
     def current_screen(self):
         rgb_img = self.nes.getScreenRGB()
         assert rgb_img.shape == (224, 256, 3)
@@ -92,6 +100,12 @@ class NES(environment.EpisodicEnvironment):
                 self.last_raw_screen = self.nes.getScreenRGB()
 
             rewards.append(self.nes.act(self.legal_actions[action]))
+            # TODO append frame to video
+            if self.movie_writer is not None:
+                # method does not return rgb #blame ale
+                bgr = self.nes.getScreenRGB()
+                rgb = bgr[:,:,[2,1,0]]
+                self.movie_writer.append_data(rgb)
 
             # Check if lives are lost
             if self.lives > self.nes.lives():
