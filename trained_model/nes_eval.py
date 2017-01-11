@@ -11,15 +11,15 @@ import multiprocessing
 import numpy as np
 
 class Evaler(object):
-    def __init__(self, rom):
+    def __init__(self, make_nes):
         super().__init__()
         def nes_factory():
             ## this env is the copy on write clone of the parameter env, because fork
             # we'r in the fork here, so make sure to remove the relics of the nes of the parent
             # nes_lib.delete_NES(env.nes.__del__())
-            return NESInterface(rom,auto_render_period=60)
+            return make_nes(60)
 
-        self.env = nes.NES(rom, outside_nes_interface=DynamicProxyProcess(nes_factory))
+        self.env = nes.NES("unused", outside_nes_interface=DynamicProxyProcess(nes_factory))
         self.lock = multiprocessing.Lock()
 
     def eval_performance(self, p_func, n_runs):

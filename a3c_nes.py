@@ -12,7 +12,8 @@ import chainer
 from chainer import links as L
 from chainer import functions as F
 import numpy as np
-from nes_python_interface import NESInterface
+from extern.fceux_learningenv.nes_python_interface.nes_python_interface import NESInterface, RewardTypes
+from hsa.ba.rewards import make_main_reward
 
 import policy
 import v_function
@@ -228,6 +229,7 @@ def main():
     parser.add_argument('--eval-n-runs', type=int, default=params.eval_n_runs)
     parser.add_argument('--weight-decay', type=float, default=params.weight_decay)
     parser.add_argument('--use-lstm', action='store_true')
+    parser.add_argument('--reward',type=str,default="ehrenbrav")
     parser.set_defaults(use_lstm=params.use_ltsm)
     args = parser.parse_args()
 
@@ -272,12 +274,29 @@ def main():
         column_names = ('steps', 'elapsed', 'mean', 'median', 'stdev')
         print('\t'.join(column_names), file=f)
 
-    evaler = Evaler(args.rom)
+    if args.reward == "ehrenbrav":
+        reward_type = RewardTypes.ehrenbrav
+        reward_function_factory = None
+    elif args.reward == "main_reward":
+        reward_type = RewardTypes.factory
+        reward_function_factory = make_main_reward
+    else:
+        raise ValueError("reward type not recognized")
+
+    def make_nes(auto_render_period):
+        return nes.NES(args.rom,
+                       outside_nes_interface=NESInterface(args.rom,
+                                                          auto_render_period=auto_render_period,
+                                                          reward_type=reward_type,
+                                                          reward_function_factory=reward_function_factory))
+
+
+    evaler = Evaler(make_nes)
     # This is the function that each process actually runs.
     def run_func(process_idx):
 
         # Initialize the emulator.
-        env = nes.NES(args.rom,outside_nes_interface=NESInterface(args.rom,auto_render_period=240))
+        env = make_nes(auto_render_period=60*30)
 
         # Initialize the network and RMSProp function.
         model, opt = model_opt()
