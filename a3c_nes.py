@@ -267,8 +267,6 @@ def main():
     counter = mp.Value('l', 0)
     start_time = time.time()
 
-    pool = mp.Pool(processes=1)
-
     # Write a header line first
     with open(os.path.join(args.outdir, 'scores.txt'), 'a+') as f:
         column_names = ('steps', 'elapsed', 'mean', 'median', 'stdev')
@@ -283,20 +281,17 @@ def main():
     else:
         raise ValueError("reward type not recognized")
 
-    def make_nes(auto_render_period):
-        return nes.NES(args.rom,
-                       outside_nes_interface=NESInterface(args.rom,
-                                                          auto_render_period=auto_render_period,
-                                                          reward_type=reward_type,
-                                                          reward_function_factory=reward_function_factory))
+    evaler = Evaler(args.rom, reward_type, reward_function_factory)
 
-
-    evaler = Evaler(make_nes)
     # This is the function that each process actually runs.
     def run_func(process_idx):
 
         # Initialize the emulator.
-        env = make_nes(auto_render_period=60*30)
+        env = nes.NES(args.rom,
+                      outside_nes_interface=NESInterface(args.rom,
+                                                         auto_render_period=60 * 30,
+                                                         reward_type=reward_type,
+                                                         reward_function_factory=reward_function_factory))
 
         # Initialize the network and RMSProp function.
         model, opt = model_opt()
