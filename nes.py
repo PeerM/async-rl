@@ -8,6 +8,8 @@ import scipy.misc
 
 import environment
 
+# ideally this would be gotten from the c++ code but because of shitty globals and fork we have to have it redundantly in python
+n_actions = 15
 
 class NES(environment.EpisodicEnvironment):
     """Arcade Learning Environment.

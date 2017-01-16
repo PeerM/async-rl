@@ -13,7 +13,7 @@ from chainer import links as L
 from chainer import functions as F
 import numpy as np
 from extern.fceux_learningenv.nes_python_interface.nes_python_interface import NESInterface, RewardTypes
-from hsa.ba.rewards import make_main_reward
+from hsa.ba.rewards import make_main_reward, make_fine_main_reward
 
 import policy
 import v_function
@@ -154,6 +154,8 @@ def train_loop(process_idx, counter, max_score, args, agent, env, evaler, start_
                 logger.info("start evaluation on %i", process_idx)
                 # We must use a copy of the model because test runs can change
                 # the hidden states of the model
+                # TODO: use the shared model because https://github.com/miyosuda/async_deep_reinforce/issues/17
+                # test_model = copy.deepcopy(agent.shared_model)
                 test_model = copy.deepcopy(agent.model)
                 test_model.reset_state()
 
@@ -240,9 +242,7 @@ def main():
 
     print('Output files are saved in {}'.format(args.outdir))
 
-    n_actions = nes.NES(args.rom).number_of_actions
-
-    # n_actions = 15
+    n_actions = nes.n_actions
 
     def model_opt():
         if args.use_lstm:
@@ -278,6 +278,9 @@ def main():
     elif args.reward == "main_reward":
         reward_type = RewardTypes.factory
         reward_function_factory = make_main_reward
+    elif args.reward == "fine_main_reward":
+        reward_type = RewardTypes.factory
+        reward_function_factory = make_fine_main_reward
     else:
         raise ValueError("reward type not recognized")
 
