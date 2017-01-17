@@ -13,7 +13,7 @@ from chainer import links as L
 from chainer import functions as F
 import numpy as np
 from extern.fceux_learningenv.nes_python_interface.nes_python_interface import NESInterface, RewardTypes
-from hsa.ba.rewards import make_main_reward, make_fine_main_reward, make_delta_points
+import hsa.ba.rewards
 
 import policy
 import v_function
@@ -277,13 +277,16 @@ def main():
         reward_function_factory = None
     elif args.reward == "main_reward":
         reward_type = RewardTypes.factory
-        reward_function_factory = make_main_reward
+        reward_function_factory = hsa.ba.rewards.make_main_reward
     elif args.reward == "fine_main_reward":
         reward_type = RewardTypes.factory
-        reward_function_factory = make_fine_main_reward
+        reward_function_factory = hsa.ba.rewards.make_fine_main_reward
     elif args.reward == "points":
         reward_type = RewardTypes.factory
-        reward_function_factory = make_delta_points
+        reward_function_factory = hsa.ba.rewards.make_delta_points
+    elif args.reward == "finer_main_reward":
+        reward_type = RewardTypes.factory
+        reward_function_factory = hsa.ba.rewards.make_finer_main_reward
     else:
         raise ValueError("reward type not recognized")
 
