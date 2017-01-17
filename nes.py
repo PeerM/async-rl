@@ -18,7 +18,7 @@ class NES(environment.EpisodicEnvironment):
     def __init__(self, rom_filename, use_sdl=False, n_last_screens=4,
                  frame_skip=4, treat_life_lost_as_terminal=False,
                  crop_or_scale='scale', max_start_nullops=0,
-                 record_screen_dir=None, outside_nes_interface=None):
+                 record_screen_path=None, outside_nes_interface=None):
         self.n_last_screens = n_last_screens
         self.treat_life_lost_as_terminal = treat_life_lost_as_terminal
         self.crop_or_scale = crop_or_scale
@@ -31,8 +31,6 @@ class NES(environment.EpisodicEnvironment):
 #        nes.setInt(b'random_seed', seed)
 #        nes.setFloat(b'repeat_action_probability', 0.0)
 #        nes.setBool(b'color_averaging', False)
-#        if record_screen_dir is not None:
-#            ale.setString(b'record_screen_dir', str.encode(record_screen_dir))
         self.frame_skip = frame_skip
 #        if use_sdl:
 #            if 'DISPLAY' not in os.environ:
@@ -53,10 +51,9 @@ class NES(environment.EpisodicEnvironment):
         self.initialize()
 
         # maybe initialize recording
-        if record_screen_dir is not None:
+        if record_screen_path is not None:
             import imageio
-            import os
-            self.movie_writer = imageio.get_writer(os.path.join(record_screen_dir, "mario_video.mp4"), fps=60, quality=9)
+            self.movie_writer = imageio.get_writer(record_screen_path, fps=60, quality=9)
         else:
             self.movie_writer = None
 

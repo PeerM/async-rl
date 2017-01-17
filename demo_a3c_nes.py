@@ -12,8 +12,8 @@ from a3c_nes import A3CLSTM
 
 
 def eval_performance(rom, model, deterministic=False,
-                     record_screen_dir=None):
-    env = nes.NES(rom,record_screen_dir=record_screen_dir)
+                     record_screen_path=None):
+    env = nes.NES(rom,record_screen_path=record_screen_path)
     model.reset_state()
     test_r = 0
     while not env.is_terminal:
@@ -57,13 +57,13 @@ def main():
     serializers.load_hdf5(args.model, model)
 
     scores = []
+    os.makedirs(args.record_screen_dir)
     for i in range(args.n_runs):
-        episode_record_dir = None
+        episode_record_path = None
         if args.record_screen_dir is not None:
-            episode_record_dir = os.path.join(args.record_screen_dir, str(i))
-            os.makedirs(episode_record_dir)
+            episode_record_path = os.path.join(args.record_screen_dir, str(i)+".mp4")
         score = eval_performance(args.rom, model, deterministic=args.deterministic,
-                                 record_screen_dir=episode_record_dir)
+                                 record_screen_path=episode_record_path)
         print('Run {}: {}'.format(i, score))
         scores.append(score)
     print('Average: {}'.format(sum(scores) / args.n_runs))
