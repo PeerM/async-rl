@@ -56,7 +56,7 @@ class NES(environment.EpisodicEnvironment):
         if record_screen_dir is not None:
             import imageio
             import os
-            self.movie_writer = imageio.get_writer(os.path.join(record_screen_dir, "mario_video.mp4"), fps=60)
+            self.movie_writer = imageio.get_writer(os.path.join(record_screen_dir, "mario_video.mp4"), fps=60, quality=9)
         else:
             self.movie_writer = None
 
