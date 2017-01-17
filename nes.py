@@ -53,7 +53,8 @@ class NES(environment.EpisodicEnvironment):
         # maybe initialize recording
         if record_screen_path is not None:
             import imageio
-            self.movie_writer = imageio.get_writer(record_screen_path, fps=60, quality=9)
+            self.movie_writer = imageio.get_writer(record_screen_path, fps=60, quality=9,
+                                                   ffmpeg_params=["-vf", "scale=iw*2:ih*2:flags=neighbor"])
         else:
             self.movie_writer = None
 
