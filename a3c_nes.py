@@ -296,6 +296,9 @@ def main():
     elif args.reward == "scaled_finer_main_reward":
         reward_type = RewardTypes.factory
         reward_function_factory = hsa.ba.rewards.make_scaled_finer_main_reward
+    elif args.reward == "scaled_fine_main_reward":
+        reward_type = RewardTypes.factory
+        reward_function_factory = hsa.ba.rewards.make_scaled_fine_main_reward
     else:
         raise ValueError("reward type not recognized")
 
