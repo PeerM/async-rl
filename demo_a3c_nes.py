@@ -57,7 +57,8 @@ def main():
     serializers.load_hdf5(args.model, model)
 
     scores = []
-    os.makedirs(args.record_screen_dir)
+    if args.record_screen_dir is not None:
+        os.makedirs(args.record_screen_dir)
     for i in range(args.n_runs):
         episode_record_path = None
         if args.record_screen_dir is not None:
