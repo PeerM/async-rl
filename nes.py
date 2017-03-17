@@ -18,7 +18,9 @@ class NES(environment.EpisodicEnvironment):
     def __init__(self, rom_filename, use_sdl=False, n_last_screens=4,
                  frame_skip=4, treat_life_lost_as_terminal=False,
                  crop_or_scale='scale', max_start_nullops=0,
-                 record_screen_path=None, outside_nes_interface=None):
+                 record_screen_path=None, outside_nes_interface=None
+                 ,every_action_callback=None):
+        self.every_action_callback = every_action_callback
         self.n_last_screens = n_last_screens
         self.treat_life_lost_as_terminal = treat_life_lost_as_terminal
         self.crop_or_scale = crop_or_scale
@@ -100,6 +102,8 @@ class NES(environment.EpisodicEnvironment):
                 self.last_raw_screen = self.nes.getScreenRGB()
 
             rewards.append(self.nes.act(self.legal_actions[action]))
+            if self.every_action_callback is not None:
+                self.every_action_callback(i,self.nes.getRAM())
             # TODO append frame to video
             if self.movie_writer is not None:
                 # method does not return rgb #blame ale
